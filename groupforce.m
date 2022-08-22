@@ -1,0 +1,268 @@
+function [matrixcar,groupcar,numcar,checkrun,waycar]=groupforce(matrixcar,Station,hadrun,waycar,rowcar,rowneedrun,length,safearea,timechange,areaStation,speed)
+    checkrun=1;
+    numcar=1;
+    %matrixcar
+    namecar=1;
+    location=2;
+    toStation=3;
+    direction=8;
+    indogde=9;
+    %Station
+    locateStation=1;
+    directStation=2;
+    timeofStation=3;
+    [soxe,~]=size(matrixcar);
+    check=1;
+    groupcar=zeros(soxe,1);
+    groupcar(1,1)=rowcar;
+    direct=matrixcar(rowcar,direction);
+    [stationsize,~]=size(Station);
+    checkonce=0;
+    [hadrunsize,~]=size(hadrun);
+    
+    cartable=zero(3,soxe-rowneedrun+1);
+    directcar=3;
+    for car=rowneedrun:soxe
+        cartable(namecar,car-rowneedrun+1)=car;
+        cartable(location,car-rowneedrun+1)=matrixcar(car,location);
+        cartable(directcar,car-rowneedrun+1)=matrixcar(car,direction);
+    end
+    [~,tablesize]=size(cartable);
+    for i=1:tablesize
+        if rowcar==cartable(namecar,i)
+            b=cartable(:,i);
+            cartable(:,i)=cartable(:,1);
+            cartable(:,1)=b;
+            break;
+        end 
+    end
+    locatecheck=cartable(location,1);
+    if direct==-1
+        for i=1:tablesize
+            locate=cartable(location,i);
+            if locate>=locatecheck
+                distance=locate-locatecheck;
+            else
+                distance=locate-locatecheck+length;
+            end
+            cartable(location,i)=distance;
+        end
+    else
+        for i=1:tablesize
+            locate=cartable(location,i);
+            if locate<=locatecheck
+                distance=locatecheck-locate;
+            else
+                distance=locatecheck-locate+length;
+            end
+            cartable(location,i)=distance;
+        end
+    end
+    
+    %sort cartable
+    for i=1:tablesize-1
+        for j=i+1:tablesize
+            if cartable(location,i)>cartable(location,j)
+                b=cartable(:,i);
+                cartable(:,i)=cartable(:,j);
+                cartable(:,j)=b;
+            end
+        end
+    end
+    checkrun=1;
+    checkok=0;
+    carcheck=2;
+    while checkok==0
+        %find the area to check
+        distance=safearea;
+        locate=matrixcar(groupcar(numcar,:),location);
+        if locate-direct*distance>=length
+            locatecheck=locate-direct*distance-length;
+        elseif locate-direct*distance<0
+            locatecheck=locate-direct*distance+length;
+        else
+            locatecheck=locate-direct*distance;
+        end
+        %check are there any station is working on the roal?
+        %if yes so the distance for force will cutdown 
+        for station=1:stationsize
+            if matrixcar(groupcar(numcar,namecar),toStation)==0
+                continue;
+            end
+            if Station(station,directStation)==0 && station~=matrixcar(groupcar(numcar,namecar),toStation)
+                continue;
+            elseif Station(station,directStation)==1 && Station(station,timeofStation)==0 && station~=matrixcar(groupcar(numcar,namecar),toStation)
+                continue;
+            elseif Station(station,directStation)==-1 && (Station(station,timeofStation)>0&&Station(station,timeofStation)<timechange) && station~=matrixcar(groupcar(numcar,namecar),toStation)
+                continue;
+            else
+                if direct==-1
+                    if Station(station,locateStation)-areaStation/2<0
+                        locatedown=Station(station,locateStation)-areaStation/2+length;
+                    else
+                        locatedown=Station(station,locateStation)-areaStation/2;
+                    end
+                    if locatecheck>locate
+                        if locatedown>=locate&& locatedown<=locatecheck
+                            distance=(locate-locatedown)/direct+areaStation;
+                            break;
+                        else
+                            continue;
+                        end
+                    else
+                        if locatedown>=locate|| locatedown<=locatecheck
+                            if locatedown<locate
+                                distance=length-locate+locatedown+areaStation;
+                            else
+                                distance=(locate-locatedown)/direct+areaStation;
+                            end
+                            break;
+                        else
+                            continue;
+                        end
+                    end
+                else
+                    if Station(station,locateStation)+areaStation/2>length
+                        locateup=Station(station,locateStation)+areaStation/2-length;
+                    else
+                        locateup=Station(station,locateStation)+areaStation/2;
+                    end
+                    if locate>locatecheck
+                        if locate>=locateup && locatecheck<=locateup
+                            distance=locate-locateup+areaStation;
+                            break;
+                        else
+                            continue;
+                        end
+                    else
+                        if locate>=locateup || locatecheck<=locateup
+                            if locate>=locateup
+                                distance=locate-locateup+areaStation;
+                            else
+                                distance=locate+length-locateup+areaStation;
+                            end
+                            break;
+                        else
+                            continue;
+                        end
+                    end
+                end
+            end
+        end
+        %compare the area between 2 car
+        distancecp=cartable(location,carcheck)-cartable(location,carcheck-1);
+        if distancecp<=distance
+            checkhadrun=0;
+            for i=1:hadrunsize
+                if hadrun(i)==cartable(namecar,carcheck)
+                    checkhadrun=1;
+                    break;
+                elseif hadrun(i)==-1
+                    break;
+                else
+                    continue;
+                end
+            end
+            if checkhadrun==1
+                checkok=1;
+                if cartable(directcar,carcheck)==direct
+                    checkrun=1;
+                else
+                    checkrun=0;
+                    [waycarsize,furlocation]=size(waycar);
+                    slotcar=0;
+                    for i=1:waycarsize
+                        if waycar(i,namecar)==carcheck
+                            slotcar=i;
+                            break;
+                        else
+                            continue;
+                        end
+                    end
+                    for i=2:numcar
+                        slot=dontslot(hadrun);
+                        hadrun(slot)=groupcar(i,namecar);
+                    end
+                    %if carcheck in hadrun have direction=0
+                        %if distance<safearea the last car ingroup can run,the other will stay in those location 
+                        %if not all groupcar stay in those location
+                    if cartable(directcar,carcheck)==0
+                        for car=1:numcar-1
+                            slot=dontslot(waycar(:,namecar));
+                            waycar(slot,namecar)=groupcar(car,namecar);
+                            matrixcar(groupcar(car,namecar),direction)=0;
+                            for i=2:furlocation
+                                if waycar(slotcar,i)==0
+                                    furlocate=i-1;
+                                    break;
+                                else
+                                    if waycar(slotcar,i)~=waycar(slotcar,location)
+                                        furlocate=i-1;
+                                        break;
+                                    else
+                                        waycar(slot,i)=matrixcar(groupcar(car,namecar),location);
+                                    end
+                                end
+                            end
+                        end
+                        %check the last car in group
+                        slot=dontslot(waycar(:,namecar));
+                        waycar(slot,namecar)=groupcar(numcar,namecar);
+                        
+                        if distance<safearea
+                            waycar(slot,location)=matrixcar(groupcar(numcar,namecar),location);
+                            matrixcar(groupcar(numcar,namecar),direction)=direct;
+                            locate=matrixcar(groupcar(numcar,namecar),location);
+                            if locate-direct*speed>length
+                                newlocate=locate-direct*speed-length;
+                            elseif locate-direct*speed<0
+                                newlocate=locate-direct*speed+length;
+                            else
+                                newlocate=locate-direct*speed;
+                            end
+                            count=timechange;
+                            for i=location:furlocate
+                                if i==location
+                                    waycar(slot,i)=locate;
+                                elseif i==location+1
+                                    waycar(slot,i)=newlocate;
+                                else
+                                    count=count-1;
+                                    waycar(slot,i)=newlocate;
+                                end
+                                if count==0
+                                    furlocate=i;
+                                    break;
+                                end
+                            end
+                        else
+                            waycar(slot,location)=matrixcar(groupcar(numcar,namecar),location);
+                            matrixcar(groupcar(numcar,namecar),direction)=0;
+                            for i=2:furlocation
+                                if waycar(slotcar,i)==0
+                                    furlocate=i-1;
+                                    break;
+                                else
+                                    if waycar(slotcar,i)~=waycar(slotcar,location)
+                                        furlocate=i-1;
+                                        break;
+                                    else
+                                        waycar(slot,i)=matrixcar(groupcar(car,namecar),location);
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        
+                    end
+                end
+            else
+                numcar=numcar+1;
+                groupcar(numcar,namecar)=carcheck;
+            end
+        else
+            
+        end
+        
+    end
+end
